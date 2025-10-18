@@ -1,6 +1,7 @@
 import json
 import requests
 import time
+import argparse
 
 def fetch_active_event_slugs():
     """Fetches the slugs of all active events."""
@@ -70,21 +71,30 @@ def process_all_active_markets():
 
 
 if __name__ == "__main__":
-    json_output = 'active_bets.json'
-    jsonl_output = 'active_bets.jsonl'
+    parser = argparse.ArgumentParser(description='Fetch and process active Polymarket bets.')
+    parser.add_argument('--get-ids', action='store_true', help='If set, the script will only output a list of market IDs.')
+    args = parser.parse_args()
 
     processed_bets = process_all_active_markets()
 
     if processed_bets:
-        # Write to JSON file
-        with open(json_output, 'w') as f:
-            json.dump(processed_bets, f, indent=4)
+        if args.get_ids:
+            market_ids = [bet['market_id'] for bet in processed_bets]
+            with open('bet_ids.json', 'w') as f:
+                json.dump(market_ids, f, indent=4)
+            print(f"Successfully created bet_ids.json with {len(market_ids)} IDs.")
+        else:
+            json_output = 'active_bets.json'
+            jsonl_output = 'active_bets.jsonl'
+            # Write to JSON file
+            with open(json_output, 'w') as f:
+                json.dump(processed_bets, f, indent=4)
 
-        # Write to JSONL file
-        with open(jsonl_output, 'w') as f:
-            for bet in processed_bets:
-                f.write(json.dumps(bet) + '\n')
+            # Write to JSONL file
+            with open(jsonl_output, 'w') as f:
+                for bet in processed_bets:
+                    f.write(json.dumps(bet) + '\n')
 
-        print(f"Successfully created {json_output} and {jsonl_output} with {len(processed_bets)} bets.")
+            print(f"Successfully created {json_output} and {jsonl_output} with {len(processed_bets)} bets.")
     else:
         print("Could not process any bets.")
