@@ -1,0 +1,16 @@
+[
+  { "supplier_id": 11, "client_id": 3, "asset_class": 1, "product": "Copper, Gold, Molybdenum" },
+  { "supplier_id": 12, "client_id": 3, "asset_class": 1, "product": "Gold, Copper, Silver" },
+  { "supplier_id": 10, "client_id": 3, "asset_class": 1, "product": "ABF Substrate" },
+  { "supplier_id": 5, "client_id": 1, "asset_class": 2, "product": "Memory" },
+  { "supplier_id": 6, "client_id": 1, "asset_class": 2, "product": "Memory" },
+  { "supplier_id": 4, "client_id": 1, "asset_class": 2, "product": "Memory, Wafer Fabrication" },
+  { "supplier_id": 2, "client_id": 3, "asset_class": 2, "product": "EUV Lithography Systems" },
+  { "supplier_id": 13, "client_id": 3, "asset_class": 2, "product": "Materials Engineering Solutions" },
+  { "supplier_id": 14, "client_id": 3, "asset_class": 2, "product": "Wafer Fabrication Equipment" },
+  { "supplier_id": 15, "client_id": 3, "asset_class": 2, "product": "Process Control Systems" },
+  { "supplier_id": 3, "client_id": 1, "asset_class": 2, "product": "Wafer Fabrication" },
+  { "supplier_id": 7, "client_id": 1, "asset_class": 3, "product": "Assembly, Testing, Packaging" },
+  { "supplier_id": 8, "client_id": 1, "asset_class": 3, "product": "Assembly, Testing, Packaging" },
+  { "supplier_id": 9, "client_id": 1, "asset_class": 3, "product": "Assembly, Testing, Packaging" }
+]

@@ -1,0 +1,17 @@
+[
+  { "id": 1, "name": "Nvidia Corp" },
+  { "id": 2, "name": "ASML Holding NV" },
+  { "id": 3, "name": "Taiwan Semiconductor Manufacturing Company Limited" },
+  { "id": 4, "name": "Samsung Electronics Co., Ltd." },
+  { "id": 5, "name": "Micron Technology, Inc." },
+  { "id": 6, "name": "SK Hynix Inc." },
+  { "id": 7, "name": "Hon Hai Precision Industry Co., Ltd." },
+  { "id": 8, "name": "Wistron Corporation" },
+  { "id": 9, "name": "Fabrinet" },
+  { "id": 10, "name": "Ajinomoto Co., Inc." },
+  { "id": 11, "name": "Freeport-McMoRan Inc." },
+  { "id": 12, "name": "Newmont Corporation" },
+  { "id": 13, "name": "Applied Materials Inc" },
+  { "id": 14, "name": "Lam Research Corporation" },
+  { "id": 15, "name": "KLA Corp" }
+]
