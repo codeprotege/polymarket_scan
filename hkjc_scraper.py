@@ -70,8 +70,6 @@ def save_to_db(results, db_path='hkjc_data.db'):
             cursor.execute('DELETE FROM entries WHERE race_id = ?', (race_id,))
 
             for entry in race['entries']:
-                # The keys in the entry dict are normalized headers
-                # we need to be careful here
                 cursor.execute('''
                     INSERT INTO entries (race_id, placing, horseno, horse_name, jockey, gear, comment)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -90,15 +88,15 @@ def save_to_db(results, db_path='hkjc_data.db'):
     conn.commit()
     conn.close()
 
-def get_all_race_dates(db_path='hkjc_data.db'):
+def get_all_race_dates_in_db(db_path='hkjc_data.db'):
     """Returns all unique race dates from the database."""
     if not os.path.exists(db_path):
-        return []
+        return set()
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute('SELECT DISTINCT race_date FROM races ORDER BY race_date DESC')
-    dates = [row[0] for row in cursor.fetchall()]
+    cursor.execute('SELECT DISTINCT race_date FROM races')
+    dates = {row[0] for row in cursor.fetchall()}
     conn.close()
     return dates
 
@@ -113,10 +111,10 @@ def get_headers():
         "Upgrade-Insecure-Requests": "1"
     }
 
-def discover_dates():
-    """Discover race dates from the fixture page."""
-    url = "https://racing.hkjc.com/en-us/local/information/fixture"
-    print(f"Discovering dates from {url}...")
+def discover_all_dates():
+    """Discover all available race dates from the corunning page."""
+    url = "https://racing.hkjc.com/en-us/local/information/corunning"
+    print(f"Discovering all available dates from {url}...")
     try:
         response = requests.get(url, headers=get_headers(), timeout=15)
         response.raise_for_status()
@@ -125,13 +123,16 @@ def discover_dates():
         return []
 
     soup = BeautifulSoup(response.text, 'html.parser')
-    # Dates are usually in links or table cells
-    # Based on the text view, dates like "1", "4", "8", "11" etc. are present for Feb 2026.
-    # Actually, we can look for "corunning?Date=" in any links or just common patterns.
-    # The fixture page lists meetings.
+    options = soup.find_all('option')
+    dates = []
+    for opt in options:
+        val = opt.get('value')
+        if val and re.match(r'\d{8}', val):
+            dates.append(val)
 
-    # Another way is to look at the 'corunning' page itself, it often has a date picker.
-    return [] # Simplified for now, let's focus on the provided date and race discovery
+    # Dedup and sort
+    dates = sorted(list(set(dates)), reverse=True)
+    return dates
 
 def scrape_race(url, headers):
     """Scrapes a single race page."""
@@ -147,13 +148,11 @@ def scrape_race(url, headers):
     tables = soup.find_all('table')
     target_table = None
     for table in tables:
-        # Code review said "Horse" instead of "Horse Name"
         if "Horse" in table.text:
             target_table = table
             break
 
     if not target_table:
-        print(f"Could not find data table on {url}")
         return None
 
     race_info = ""
@@ -206,22 +205,23 @@ def scrape_race(url, headers):
         "entries": entries
     }
 
-def scrape_hkjc_corunning(start_url):
-    """Scrapes all races for a given date starting from one race URL."""
+def scrape_date(date_str):
+    """Scrapes all races for a specific date string (YYYYMMDD)."""
+    start_url = f"https://racing.hkjc.com/en-us/local/information/corunning?Date={date_str}"
     headers = get_headers()
 
-    print(f"Fetching start page: {start_url}")
+    print(f"Scraping date {date_str}...")
     try:
         response = requests.get(start_url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
-        print(f"Failed to fetch start page: {e}")
+        print(f"Failed to fetch date page {date_str}: {e}")
         return []
 
     soup = BeautifulSoup(response.text, 'html.parser')
     race_links = soup.find_all('a', href=re.compile(r'raceno=\d+', re.IGNORECASE))
-    all_urls_to_scrape = {start_url}
 
+    all_urls_to_scrape = {start_url}
     for link in race_links:
         href = link['href']
         if not href.startswith('http'):
@@ -230,7 +230,7 @@ def scrape_hkjc_corunning(start_url):
             else:
                 href = "https://racing.hkjc.com/en-us/local/information/" + href
 
-        if "corunning" in href.lower():
+        if "corunning" in href.lower() and date_str in href:
             all_urls_to_scrape.add(href)
 
     def get_race_no(url):
@@ -239,27 +239,29 @@ def scrape_hkjc_corunning(start_url):
 
     sorted_urls = sorted(list(all_urls_to_scrape), key=get_race_no)
 
-    all_results = []
+    date_results = []
     for url in sorted_urls:
-        print(f"Scraping {url}...")
+        print(f"  Scraping {url}...")
         race_data = scrape_race(url, headers)
         if race_data:
-            all_results.append(race_data)
-        time.sleep(1.5)
+            date_results.append(race_data)
+        time.sleep(1.0)
 
-    return all_results
+    return date_results
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='HKJC Scraper')
-    parser.add_argument('url', nargs='?', help='URL to scrape (optional)')
+    parser.add_argument('url', nargs='?', help='URL to scrape a specific meeting (optional)')
     parser.add_argument('--list-dates', action='store_true', help='List all race dates in the database')
+    parser.add_argument('--scrape-all', action='store_true', help='Scrape all available dates from the website')
+    parser.add_argument('--force', action='store_true', help='Force re-scrape of already processed dates')
 
     args = parser.parse_args()
 
     if args.list_dates:
-        dates = get_all_race_dates()
+        dates = sorted(list(get_all_race_dates_in_db()), reverse=True)
         if dates:
             print("Found race dates in database:")
             for d in dates:
@@ -268,21 +270,49 @@ if __name__ == "__main__":
             print("No race dates found in database.")
         sys.exit(0)
 
-    start_url = args.url if args.url else "https://racing.hkjc.com/en-us/local/information/corunning?Date=20260211"
+    if args.scrape_all:
+        all_available_dates = discover_all_dates()
+        print(f"Found {len(all_available_dates)} available dates.")
 
-    results = scrape_hkjc_corunning(start_url)
+        processed_dates = get_all_race_dates_in_db() if not args.force else set()
+
+        dates_to_scrape = [d for d in all_available_dates if d not in processed_dates]
+        print(f"{len(dates_to_scrape)} dates to scrape.")
+
+        for i, date_str in enumerate(dates_to_scrape):
+            print(f"Processing date {i+1}/{len(dates_to_scrape)}: {date_str}")
+            results = scrape_date(date_str)
+            if results:
+                save_to_db(results)
+                print(f"  Saved {len(results)} races for {date_str} to database.")
+            else:
+                print(f"  No data found for {date_str}.")
+            time.sleep(2.0)
+
+        print("Full site scrape complete.")
+        sys.exit(0)
+
+    # Default behavior: scrape one date
+    if args.url:
+        # If it's a date string instead of a URL
+        if re.match(r'\d{8}', args.url):
+            results = scrape_date(args.url)
+        else:
+            # Assume it's a start URL
+            results = []
+            # We need to extract the date to reuse scrape_date or just use the old logic
+            date_match = re.search(r'Date=(\d+)', args.url, re.IGNORECASE)
+            if date_match:
+                results = scrape_date(date_match.group(1))
+            else:
+                print("Could not extract date from URL. Please provide a standard corunning URL.")
+    else:
+        # Default date
+        results = scrape_date("20260211")
 
     if results:
-        # Save to SQLite
         save_to_db(results)
         print("Data exported to SQLite database: hkjc_data.db")
-
-        # Save to JSON
-        output_file = 'hkjc_data.json'
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=4, ensure_ascii=False)
-        print(f"Data also saved to {output_file}")
-
         print(f"Scraping complete. {len(results)} races scraped.")
     else:
         print("No data scraped.")
