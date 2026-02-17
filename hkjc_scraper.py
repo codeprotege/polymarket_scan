@@ -6,7 +6,7 @@ import re
 import sys
 import sqlite3
 import os
-from datetime import datetime
+from hkjc_date_finder import discover_dates_in_range, fetch_with_retry, get_headers
 
 def init_db(db_path='hkjc_data.db'):
     """Initializes the SQLite database with the required schema."""
@@ -101,62 +101,6 @@ def get_all_race_dates_in_db(db_path='hkjc_data.db'):
     dates = {row[0] for row in cursor.fetchall()}
     conn.close()
     return dates
-
-def get_headers():
-    return {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://racing.hkjc.com/en-us/local/information/corunning",
-        "DNT": "1",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1"
-    }
-
-def fetch_with_retry(url, headers, timeout=30, retries=3):
-    for i in range(retries):
-        try:
-            response = requests.get(url, headers=headers, timeout=timeout)
-            response.raise_for_status()
-            return response
-        except Exception as e:
-            if i == retries - 1:
-                raise e
-            print(f"  Retry {i+1}/{retries} for {url} due to: {e}")
-            time.sleep(2 * (i + 1))
-
-def discover_dates_in_range(start_year=2015, end_year=None):
-    """Discovers all race dates from start_year to present by checking fixture pages."""
-    if end_year is None:
-        end_year = datetime.now().year
-
-    all_dates = []
-    headers = get_headers()
-
-    for year in range(start_year, end_year + 1):
-        for month in range(1, 13):
-            if year == datetime.now().year and month > datetime.now().month + 1:
-                break
-
-            url = f"https://racing.hkjc.com/en-us/local/information/fixture?calyear={year}&calmonth={month:02d}"
-            print(f"Checking fixtures for {year}/{month:02d}...")
-            try:
-                response = fetch_with_retry(url, headers)
-                soup = BeautifulSoup(response.text, 'html.parser')
-                tds = soup.find_all('td')
-                for td in tds:
-                    if td.find('img', src=re.compile(r'/(st|hv|ch)\.gif')):
-                        day_match = re.search(r'(\d+)', td.get_text())
-                        if day_match:
-                            day = int(day_match.group(1))
-                            if 1 <= day <= 31:
-                                date_str = f"{year}{month:02d}{day:02d}"
-                                all_dates.append(date_str)
-                time.sleep(1.0)
-            except Exception as e:
-                print(f"Error fetching fixture for {year}/{month:02d}: {e}")
-
-    return sorted(list(set(all_dates)), reverse=True)
 
 def scrape_race(url, headers):
     """Scrapes a single race page."""
@@ -309,7 +253,7 @@ if __name__ == "__main__":
                 print(f"  Saved {len(results)} races for {date_str} to database.")
             else:
                 print(f"  No data found for {date_str}.")
-            time.sleep(2.0)
+            time.sleep(1.0)
 
         print("Full site scrape complete.")
         sys.exit(0)
